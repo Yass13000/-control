@@ -10,14 +10,6 @@
         body { background: #020617; color: #f8fafc; font-family: system-ui; }
         .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
         ::-webkit-scrollbar { display: none; }
-        
-        /* Animation pour les mises à jour live */
-        @keyframes pulse-blue {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-        .updating { animation: pulse-blue 1s ease-out; }
     </style>
 </head>
 <body class="p-4 pb-20">
@@ -27,7 +19,7 @@
         <section class="space-y-6">
             <div class="flex justify-between items-center">
                 <h2 class="text-sm font-black uppercase tracking-[0.2em] text-blue-500 italic">Configuration Mur</h2>
-                <select id="gridSelect" onchange="createGrid()" class="bg-slate-800 text-[10px] font-bold p-2 rounded-lg border-none outline-none ring-1 ring-slate-700">
+                <select id="gridSelect" onchange="createGrid()" class="bg-slate-800 text-[10px] font-bold p-2 rounded-lg border-none outline-none ring-1 ring-slate-700 cursor-pointer">
                     <option value="1x2">MUR 1x2</option>
                     <option value="1x3">MUR 1x3</option>
                     <option value="1x4">MUR 1x4</option>
@@ -38,8 +30,8 @@
             <div id="wallGrid" class="grid gap-3 min-h-[160px]"></div>
 
             <div class="space-y-2">
-                <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">URL Vidéo (Google Drive Direct)</label>
-                <input id="videoUrl" type="text" placeholder="https://drive.google.com/uc?export=download&id=..." 
+                <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">URL Vidéo (Le lien Drive sera nettoyé auto)</label>
+                <input id="videoUrl" type="text" placeholder="https://drive.google.com/..." 
                     class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl p-4 text-sm focus:border-blue-500 outline-none transition-all font-mono text-blue-300">
             </div>
             
@@ -71,7 +63,7 @@
 
     <div id="modal" class="fixed inset-0 bg-black/95 hidden items-center justify-center p-6 z-50 backdrop-blur-sm">
         <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4 shadow-2xl border-slate-700">
-            <h3 class="text-center text-xs font-black uppercase text-slate-400">Assigner un écran au Slot</h3>
+            <h3 class="text-center text-xs font-black uppercase text-slate-400">Assigner un écran</h3>
             <div id="screenList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1"></div>
             <button onclick="closeModal()" class="w-full text-[10px] font-bold py-3 text-slate-500 uppercase hover:text-white transition-all">Annuler</button>
         </div>
@@ -162,30 +154,68 @@
 
         // --- DÉPLOIEMENT ---
         async function applyConfig() {
-            const url = document.getElementById('videoUrl').value.trim();
+            let url = document.getElementById('videoUrl').value.trim();
             const val = document.getElementById('gridSelect').value;
             const [rows, cols] = val.split('x').map(Number);
+            const totalSlots = rows * cols;
 
             if(!url) return alert("Veuillez entrer une URL vidéo");
-            if(Object.keys(currentAssignments).length === 0) return alert("Assignez au moins un écran");
 
-            for(let slot in currentAssignments) {
-                const i = parseInt(slot);
+            // NETTOYAGE AUTO GOOGLE DRIVE
+            if (url.includes("drive.google.com") && url.includes("/d/")) {
+                try {
+                    const id = url.split("/d/")[1].split("/")[0];
+                    url = `https://drive.google.com/uc?export=download&id=${id}`;
+                    document.getElementById('videoUrl').value = url; // Met à jour le champ pour que l'utilisateur le voie
+                } catch(e) {
+                    console.log("Erreur parsing lien Drive", e);
+                }
+            }
+
+            let updatesCount = 0;
+
+            // On boucle UNIQUEMENT sur les slots visibles de la grille
+            for(let i = 0; i < totalSlots; i++) {
                 const screenId = currentAssignments[i];
                 
-                // Calcul des coordonnées 2D
-                const posX = i % cols;
-                const posY = Math.floor(i / cols);
+                if(screenId) {
+                    const posX = i % cols;
+                    const posY = Math.floor(i / cols);
 
-                await sbClient.from('screens_config').update({
-                    video_url: url,
-                    total_cols: cols,
-                    total_rows: rows,
-                    pos_x: posX,
-                    pos_y: posY
-                }).eq('id', screenId);
+                    await sbClient.from('screens_config').update({
+                        video_url: url,
+                        total_cols: cols,
+                        total_rows: rows,
+                        pos_x: posX,
+                        pos_y: posY
+                    }).eq('id', screenId);
+                    
+                    updatesCount++;
+                }
             }
+            
+            if(updatesCount === 0) return alert("Assignez au moins un écran avant de déployer !");
             alert("✅ Configuration envoyée aux écrans !");
+        }
+
+        // --- RESET UN ÉCRAN (Détacher du mur) ---
+        async function resetScreen(id) {
+            if(!confirm(`Détacher l'écran ${id} du mur et le remettre à zéro ?`)) return;
+            
+            // On remet la config de base dans Supabase
+            await sbClient.from('screens_config').update({ 
+                total_cols: 1, 
+                total_rows: 1,
+                pos_x: 0, 
+                pos_y: 0,
+                video_url: '' 
+            }).eq('id', id);
+            
+            // On le retire de nos assignations locales s'il y était
+            for(let key in currentAssignments) {
+                if(currentAssignments[key] === id) delete currentAssignments[key];
+            }
+            createGrid(); // Rafraîchit le visuel
         }
 
         // --- AFFICHAGE LIVE ---
@@ -195,11 +225,14 @@
                 <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 || s.total_rows > 1 ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-700 opacity-60'}">
                     <div class="space-y-1">
                         <p class="text-xs font-black uppercase tracking-tighter">${s.id}</p>
-                        <p class="text-[9px] text-slate-500 font-mono truncate w-44">${s.video_url || 'En attente...'}</p>
+                        <p class="text-[9px] text-slate-500 font-mono truncate w-40">${s.video_url || 'En attente...'}</p>
                     </div>
-                    <div class="text-right">
-                        <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
-                        <p class="text-[10px] font-black text-blue-400 uppercase">X:${s.pos_x} Y:${s.pos_y}</p>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
+                            <p class="text-[10px] font-black text-blue-400 uppercase">X:${s.pos_x} Y:${s.pos_y}</p>
+                        </div>
+                        <button onclick="resetScreen('${s.id}')" class="bg-red-500/10 text-red-500 p-2 rounded-lg text-[10px] hover:bg-red-500 hover:text-white transition-all" title="Détacher cet écran">✕</button>
                     </div>
                 </div>
             `).join('');
@@ -209,6 +242,10 @@
         function renderPresets() {
             const presets = JSON.parse(localStorage.getItem('mb_presets') || '[]');
             const container = document.getElementById('presetList');
+            if(presets.length === 0) {
+                container.innerHTML = '<p class="col-span-2 text-center text-[10px] text-slate-600 italic py-4">Aucun preset sauvegardé</p>';
+                return;
+            }
             container.innerHTML = presets.map((p, idx) => `
                 <div class="glass p-4 rounded-2xl border border-amber-500/20 space-y-3">
                     <p class="text-[9px] font-black uppercase truncate text-amber-500">${p.name}</p>
