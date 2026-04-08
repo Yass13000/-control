@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MenuBoard Vision</title>
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background: radial-gradient(circle at top right, #1e293b, #020617);
+            color: white; font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .glass { 
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .gradient-text {
+            background: linear-gradient(to right, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+
+    <header class="max-w-5xl mx-auto flex justify-between items-center mb-12">
+        <div>
+            <h1 class="text-2xl font-800 tracking-tighter uppercase italic">MenuBoard<span class="gradient-text">Vision</span></h1>
+            <p class="text-[10px] text-gray-500 font-bold tracking-[0.3em] uppercase">Control Center v2.0</p>
+        </div>
+        <div id="status-dot" class="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-4 py-2 rounded-full border border-emerald-400/20">
+            <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span></span>
+            Cloud Connecté
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <section class="glass p-8 rounded-[2rem] md:col-span-2 space-y-6 glow-blue">
+            <div class="flex justify-between items-end">
+                <h2 class="text-xl font-semibold">Diffusion Instantanée</h2>
+                <span class="text-[10px] text-gray-500 font-bold uppercase">Lien Vidéo</span>
+            </div>
+            <div class="relative">
+                <input id="globalVideoUrl" type="text" placeholder="Coller le lien Google Drive ici..." 
+                    class="w-full bg-black/40 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:border-blue-500/50 transition-all pr-32">
+                <button onclick="updateAllScreensVideo()" 
+                    class="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 px-6 rounded-xl font-bold text-xs transition-all active:scale-95">
+                    Diffuser
+                </button>
+            </div>
+            <div class="flex gap-3 overflow-x-auto pb-2">
+                <button onclick="applyPreset('wall1x2')" class="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/5 px-4 py-2 rounded-full text-xs transition-colors">📐 Mode Mur 1x2</button>
+                <button onclick="applyPreset('independent')" class="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/5 px-4 py-2 rounded-full text-xs transition-colors">📺 Écrans Distincts</button>
+                <button onclick="applyPreset('mirror')" class="whitespace-nowrap bg-white/5 hover:bg-white/10 border border-white/5 px-4 py-2 rounded-full text-xs transition-colors">👯 Mode Miroir</button>
+            </div>
+        </section>
+
+        <section class="glass p-8 rounded-[2rem] flex flex-col justify-between">
+            <h2 class="text-gray-400 text-xs font-bold uppercase">Écrans Actifs</h2>
+            <div id="quick-status" class="space-y-4 py-4">
+                </div>
+            <p class="text-[10px] text-gray-600">Mise à jour automatique toutes les 10s</p>
+        </section>
+
+        <section id="screens-list" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </section>
+
+    </main>
+
+    <script>
+        const SB_URL = "https://bfpddpdkortuhrzxflmt.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmcGRkcGRrb3J0dWhyenhmbG10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjMwNTgsImV4cCI6MjA5MTIzOTA1OH0.F5Rk6m8qE81UrCmhYRxRJy_QucxXX8CiIexrNDXb3ME";
+        const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+        async function fetchScreens() {
+            const { data, error } = await sbClient.from('screens_config').select('*').order('id');
+            if (data) {
+                renderUI(data);
+                renderStatus(data);
+            }
+        }
+
+        function renderStatus(screens) {
+            const container = document.getElementById('quick-status');
+            container.innerHTML = screens.map(s => `
+                <div class="flex items-center gap-3">
+                    <div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></div>
+                    <span class="text-sm font-medium">${s.id}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderUI(screens) {
+            const container = document.getElementById('screens-list');
+            container.innerHTML = screens.map(s => `
+                <div class="glass p-6 rounded-[2rem] space-y-6">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-bold text-lg">${s.id}</h3>
+                        <span class="text-[10px] bg-white/5 border border-white/10 px-3 py-1 rounded-full text-gray-400">ID: ${s.id}</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500">Position Horizontale</span>
+                            <span class="font-bold text-blue-400">${s.pos_x == 0 ? 'GAUCHE' : 'DROITE'}</span>
+                        </div>
+                        <input type="range" min="0" max="1" step="1" value="${s.pos_x}" 
+                            onchange="quickUpdate('${s.id}', 'pos_x', this.value)"
+                            class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <details class="group">
+                        <summary class="text-[10px] font-bold text-gray-500 cursor-pointer list-none flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                            RÉGLAGES AVANCÉS
+                            <span class="group-open:rotate-180 transition-transform">↓</span>
+                        </summary>
+                        <div class="pt-4 grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-[9px] text-gray-600 uppercase">Cols</label>
+                                <input type="number" value="${s.total_cols}" onchange="quickUpdate('${s.id}', 'total_cols', this.value)" class="w-full bg-black/20 border border-white/5 rounded-lg p-2 text-xs">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[9px] text-gray-600 uppercase">Lignes</label>
+                                <input type="number" value="${s.total_rows}" onchange="quickUpdate('${s.id}', 'total_rows', this.value)" class="w-full bg-black/20 border border-white/5 rounded-lg p-2 text-xs">
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            `).join('');
+        }
+
+        async function quickUpdate(id, field, value) {
+            const update = {}; update[field] = parseInt(value);
+            await sbClient.from('screens_config').update(update).eq('id', id);
+            fetchScreens();
+        }
+
+        async function updateAllScreensVideo() {
+            const url = document.getElementById('globalVideoUrl').value;
+            if(!url) return;
+            await sbClient.from('screens_config').update({ video_url: url }).neq('id', 'nothing');
+            showToast("Vidéo synchronisée !");
+            fetchScreens();
+        }
+
+        async function applyPreset(mode) {
+            if(mode === 'wall1x2') {
+                await sbClient.from('screens_config').update({ total_cols: 2, total_rows: 1, pos_x: 0 }).eq('id', 'ecran_gauche');
+                await sbClient.from('screens_config').update({ total_cols: 2, total_rows: 1, pos_x: 1 }).eq('id', 'ecran_droite');
+            } else if(mode === 'mirror') {
+                await sbClient.from('screens_config').update({ total_cols: 1, total_rows: 1, pos_x: 0 }).neq('id', 'nothing');
+            }
+            showToast("Mode " + mode + " activé");
+            fetchScreens();
+        }
+
+        function showToast(msg) {
+            const t = document.createElement('div');
+            t.className = "fixed bottom-8 left-1/2 -translate-x-1/2 glass px-8 py-4 rounded-full text-xs font-bold border border-emerald-500/30 text-emerald-400 animate-bounce";
+            t.innerText = "✨ " + msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        fetchScreens();
+        setInterval(fetchScreens, 10000);
+    </script>
+</body>
+</html>
