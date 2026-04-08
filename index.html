@@ -74,13 +74,38 @@
         let targetSlot = null;
 
         async function init() {
-            const { data: screens } = await sbClient.from('screens_config').select('*');
-            availableScreens = screens || [];
-            
-            renderLiveStatus();
-            renderPresets();
-            createGrid();
-        }
+        // 1. Premier chargement manuel
+        const { data } = await sbClient.from('screens_config').select('*');
+        availableScreens = data || [];
+        
+        renderLiveStatus();
+        renderPresets();
+        createGrid();
+
+        // 2. LE MODE TEMPS RÉEL (La Magie)
+        sbClient
+            .channel('schema-db-changes')
+            .on(
+                'postgres_changes', 
+                { event: '*', schema: 'public', table: 'screens_config' }, 
+                (payload) => {
+                    console.log('Changement détecté !', payload);
+                    // On met à jour l'écran précis qui a changé dans notre liste locale
+                    const index = availableScreens.findIndex(s => s.id === payload.new.id);
+                    if (index !== -1) {
+                        availableScreens[index] = payload.new;
+                    } else if (payload.eventType === 'INSERT') {
+                        availableScreens.push(payload.new);
+                    } else if (payload.eventType === 'DELETE') {
+                        availableScreens = availableScreens.filter(s => s.id !== payload.old.id);
+                    }
+                    
+                    // On relance le dessin de l'interface sans recharger la page
+                    renderLiveStatus();
+                }
+            )
+            .subscribe();
+    }
 
         // --- GESTION DU LIVE ---
         function renderLiveStatus() {
