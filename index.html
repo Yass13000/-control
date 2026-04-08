@@ -10,6 +10,8 @@
         body { background: #020617; color: #f8fafc; font-family: system-ui; }
         .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
         .slot.active { border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        /* Pour cacher la scrollbar mais garder le défilement */
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="p-4 pb-20">
@@ -45,20 +47,19 @@
 
         <section class="space-y-4">
             <h2 class="text-sm font-black uppercase tracking-[0.2em] text-emerald-500 italic">Live Status</h2>
-            <div id="liveList" class="space-y-3">
-                </div>
+            <div id="liveList" class="space-y-3"></div>
         </section>
 
         <section class="space-y-4 pb-10">
             <h2 class="text-sm font-black uppercase tracking-[0.2em] text-amber-500 italic">Bibliothèque</h2>
-            <div id="presetList" class="grid grid-cols-2 gap-3">
-                </div>
+            <div id="presetList" class="grid grid-cols-2 gap-3"></div>
         </section>
 
     </main>
 
     <div id="modal" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-6 z-50">
         <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4">
+            <h3 class="text-center text-xs font-bold uppercase">Choisir un écran</h3>
             <div id="screenList" class="space-y-2"></div>
             <button onclick="closeModal()" class="w-full text-[10px] font-bold py-2 text-slate-500 uppercase">Fermer</button>
         </div>
@@ -73,44 +74,50 @@
         let currentAssignments = {};
         let targetSlot = null;
 
+        // --- INITIALISATION ---
         async function init() {
-        // 1. Premier chargement manuel
-        const { data } = await sbClient.from('screens_config').select('*');
-        availableScreens = data || [];
-        
-        renderLiveStatus();
-        renderPresets();
-        createGrid();
+            // 1. On récupère les données initiales
+            const { data } = await sbClient.from('screens_config').select('*');
+            availableScreens = data || [];
+            
+            // 2. On branche le Realtime UNE SEULE FOIS
+            setupRealtime();
 
-        // 2. LE MODE TEMPS RÉEL (La Magie)
-        sbClient
-            .channel('schema-db-changes')
-            .on(
-                'postgres_changes', 
-                { event: '*', schema: 'public', table: 'screens_config' }, 
-                (payload) => {
-                    console.log('Changement détecté !', payload);
-                    // On met à jour l'écran précis qui a changé dans notre liste locale
-                    const index = availableScreens.findIndex(s => s.id === payload.new.id);
-                    if (index !== -1) {
-                        availableScreens[index] = payload.new;
-                    } else if (payload.eventType === 'INSERT') {
-                        availableScreens.push(payload.new);
-                    } else if (payload.eventType === 'DELETE') {
-                        availableScreens = availableScreens.filter(s => s.id !== payload.old.id);
+            // 3. On affiche l'interface
+            renderLiveStatus();
+            renderPresets();
+            createGrid();
+        }
+
+        function setupRealtime() {
+            sbClient
+                .channel('db-changes')
+                .on(
+                    'postgres_changes', 
+                    { event: '*', schema: 'public', table: 'screens_config' }, 
+                    (payload) => {
+                        console.log('Changement détecté !', payload);
+                        
+                        if (payload.eventType === 'DELETE') {
+                            availableScreens = availableScreens.filter(s => s.id !== payload.old.id);
+                        } else if (payload.eventType === 'INSERT') {
+                            availableScreens.push(payload.new);
+                        } else if (payload.eventType === 'UPDATE') {
+                            const index = availableScreens.findIndex(s => s.id === payload.new.id);
+                            if (index !== -1) availableScreens[index] = payload.new;
+                        }
+                        
+                        renderLiveStatus();
                     }
-                    
-                    // On relance le dessin de l'interface sans recharger la page
-                    renderLiveStatus();
-                }
-            )
-            .subscribe();
-    }
+                )
+                .subscribe();
+        }
 
         // --- GESTION DU LIVE ---
         function renderLiveStatus() {
             const container = document.getElementById('liveList');
-            // On ne montre que les écrans qui sont configurés en "Mur" (total_cols > 1)
+            if (!container) return;
+
             container.innerHTML = availableScreens.map(s => `
                 <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 ? 'border-emerald-500' : 'border-slate-700 opacity-50'}">
                     <div class="space-y-1">
@@ -119,7 +126,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">Grille: ${s.total_cols}x${s.total_rows}</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
                             <p class="text-[9px] font-bold text-blue-400 uppercase">Pos: ${s.pos_x}</p>
                         </div>
                         <button onclick="resetScreen('${s.id}')" class="bg-red-500/10 text-red-500 p-2 rounded-lg text-[10px] hover:bg-red-500 hover:text-white transition-all">✕</button>
@@ -130,11 +137,15 @@
 
         async function resetScreen(id) {
             if(!confirm(`Réinitialiser l'écran ${id} ?`)) return;
-            await sbClient.from('screens_config').update({ total_cols: 1, pos_x: 0, video_url: '' }).eq('id', id);
-            location.reload();
+            // On met à jour la base, le Realtime s'occupe de l'affichage
+            await sbClient.from('screens_config').update({ 
+                total_cols: 1, 
+                pos_x: 0, 
+                video_url: '' 
+            }).eq('id', id);
         }
 
-        // --- GESTION DES PRESETS (LOCALE POUR L'EXEMPLE) ---
+        // --- GESTION DES PRESETS ---
         function renderPresets() {
             const presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
             const container = document.getElementById('presetList');
@@ -154,7 +165,7 @@
         }
 
         function saveAsPreset() {
-            const name = prompt("Nom du preset (ex: Menu Burger Midi) :");
+            const name = prompt("Nom du preset :");
             if(!name) return;
             const presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
             presets.push({
@@ -215,18 +226,26 @@
 
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
+        // --- APPLICATION ---
         async function applyConfig() {
             const url = document.getElementById('videoUrl').value;
             const cols = parseInt(document.getElementById('gridSelect').value);
             if(!url) return alert("URL manquante");
             
+            // On boucle sur les assignations et on update
             for(let slot in currentAssignments) {
+                const screenId = currentAssignments[slot];
                 await sbClient.from('screens_config').update({
-                    video_url: url, total_cols: cols, pos_x: parseInt(slot), total_rows: 1, pos_y: 0
-                }).eq('id', currentAssignments[slot]);
+                    video_url: url, 
+                    total_cols: cols, 
+                    pos_x: parseInt(slot), 
+                    total_rows: 1, 
+                    pos_y: 0
+                }).eq('id', screenId);
             }
-            alert("🚀 Mur synchronisé !");
-            init(); // Refresh data
+            
+            alert("🚀 Mur mis à jour !");
+            // NOTE : On n'appelle plus init() ici pour éviter de doubler le Realtime.
         }
 
         init();
