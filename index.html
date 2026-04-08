@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MenuBoard Studio</title>
+    <title>MenuBoard Studio | Architecte 2x2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background: #020617; color: #f8fafc; font-family: system-ui; }
         .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .slot.active { border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.1); }
-        /* Pour cacher la scrollbar mais garder le défilement */
         ::-webkit-scrollbar { display: none; }
+        
+        /* Animation pour les mises à jour live */
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .updating { animation: pulse-blue 1s ease-out; }
     </style>
 </head>
 <body class="p-4 pb-20">
@@ -20,34 +26,40 @@
         
         <section class="space-y-6">
             <div class="flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase tracking-[0.2em] text-blue-500 italic">Préparation</h2>
-                <select id="gridSelect" onchange="createGrid()" class="bg-slate-800 text-[10px] font-bold p-2 rounded-lg border-none outline-none">
-                    <option value="2">GRILLE 1x2</option>
-                    <option value="3">GRILLE 1x3</option>
-                    <option value="4">GRILLE 1x4</option>
+                <h2 class="text-sm font-black uppercase tracking-[0.2em] text-blue-500 italic">Configuration Mur</h2>
+                <select id="gridSelect" onchange="createGrid()" class="bg-slate-800 text-[10px] font-bold p-2 rounded-lg border-none outline-none ring-1 ring-slate-700">
+                    <option value="1x2">MUR 1x2</option>
+                    <option value="1x3">MUR 1x3</option>
+                    <option value="1x4">MUR 1x4</option>
+                    <option value="2x2" selected>MUR 2x2 (Carré)</option>
                 </select>
             </div>
 
-            <div id="wallGrid" class="flex gap-2 min-h-[80px]"></div>
+            <div id="wallGrid" class="grid gap-3 min-h-[160px]"></div>
 
-            <input id="videoUrl" type="text" placeholder="URL de la vidéo..." 
-                class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl p-4 text-sm focus:border-blue-500 outline-none transition-all">
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">URL Vidéo (Google Drive Direct)</label>
+                <input id="videoUrl" type="text" placeholder="https://drive.google.com/uc?export=download&id=..." 
+                    class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl p-4 text-sm focus:border-blue-500 outline-none transition-all font-mono text-blue-300">
+            </div>
             
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="applyConfig()" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-lg shadow-blue-900/20">
-                    Déployer au Live
+                <button onclick="applyConfig()" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-lg shadow-blue-900/40 active:scale-95">
+                    🚀 Déployer au Live
                 </button>
-                <button onclick="saveAsPreset()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-2xl font-black text-xs uppercase transition-all border border-slate-700">
+                <button onclick="saveAsPreset()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-2xl font-black text-xs uppercase transition-all border border-slate-700 active:scale-95">
                     💾 Sauver Preset
                 </button>
             </div>
         </section>
 
-        <hr class="border-slate-800">
+        <hr class="border-slate-800/50">
 
         <section class="space-y-4">
             <h2 class="text-sm font-black uppercase tracking-[0.2em] text-emerald-500 italic">Live Status</h2>
-            <div id="liveList" class="space-y-3"></div>
+            <div id="liveList" class="space-y-3">
+                <p class="text-center text-xs text-slate-600 animate-pulse">Connexion à Supabase...</p>
+            </div>
         </section>
 
         <section class="space-y-4 pb-10">
@@ -57,11 +69,11 @@
 
     </main>
 
-    <div id="modal" class="fixed inset-0 bg-black/90 hidden items-center justify-center p-6 z-50">
-        <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4">
-            <h3 class="text-center text-xs font-bold uppercase">Choisir un écran</h3>
-            <div id="screenList" class="space-y-2"></div>
-            <button onclick="closeModal()" class="w-full text-[10px] font-bold py-2 text-slate-500 uppercase">Fermer</button>
+    <div id="modal" class="fixed inset-0 bg-black/95 hidden items-center justify-center p-6 z-50 backdrop-blur-sm">
+        <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4 shadow-2xl border-slate-700">
+            <h3 class="text-center text-xs font-black uppercase text-slate-400">Assigner un écran au Slot</h3>
+            <div id="screenList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1"></div>
+            <button onclick="closeModal()" class="w-full text-[10px] font-bold py-3 text-slate-500 uppercase hover:text-white transition-all">Annuler</button>
         </div>
     </div>
 
@@ -74,147 +86,70 @@
         let currentAssignments = {};
         let targetSlot = null;
 
-        // --- INITIALISATION ---
+        // --- DÉMARRAGE ---
         async function init() {
-            // 1. On récupère les données initiales
-            const { data } = await sbClient.from('screens_config').select('*');
+            const { data, error } = await sbClient.from('screens_config').select('*');
+            if(error) console.error(error);
             availableScreens = data || [];
             
-            // 2. On branche le Realtime UNE SEULE FOIS
             setupRealtime();
-
-            // 3. On affiche l'interface
             renderLiveStatus();
             renderPresets();
             createGrid();
         }
 
+        // --- REALTIME (UNE SEULE FOIS) ---
         function setupRealtime() {
-            sbClient
-                .channel('db-changes')
-                .on(
-                    'postgres_changes', 
-                    { event: '*', schema: 'public', table: 'screens_config' }, 
-                    (payload) => {
-                        console.log('Changement détecté !', payload);
-                        
-                        if (payload.eventType === 'DELETE') {
-                            availableScreens = availableScreens.filter(s => s.id !== payload.old.id);
-                        } else if (payload.eventType === 'INSERT') {
-                            availableScreens.push(payload.new);
-                        } else if (payload.eventType === 'UPDATE') {
-                            const index = availableScreens.findIndex(s => s.id === payload.new.id);
-                            if (index !== -1) availableScreens[index] = payload.new;
-                        }
-                        
-                        renderLiveStatus();
+            sbClient.channel('any').on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'screens_config' }, 
+                (payload) => {
+                    const { eventType, new: newRow, old: oldRow } = payload;
+                    if (eventType === 'DELETE') {
+                        availableScreens = availableScreens.filter(s => s.id !== oldRow.id);
+                    } else if (eventType === 'INSERT') {
+                        availableScreens.push(newRow);
+                    } else {
+                        const idx = availableScreens.findIndex(s => s.id === newRow.id);
+                        if(idx !== -1) availableScreens[idx] = newRow;
                     }
-                )
-                .subscribe();
+                    renderLiveStatus();
+                }
+            ).subscribe();
         }
 
-        // --- GESTION DU LIVE ---
-        function renderLiveStatus() {
-            const container = document.getElementById('liveList');
-            if (!container) return;
-
-            container.innerHTML = availableScreens.map(s => `
-                <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 ? 'border-emerald-500' : 'border-slate-700 opacity-50'}">
-                    <div class="space-y-1">
-                        <p class="text-xs font-bold uppercase tracking-tighter">${s.id}</p>
-                        <p class="text-[9px] text-slate-500 font-mono italic truncate w-40">${s.video_url || 'Pas de vidéo'}</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
-                            <p class="text-[9px] font-bold text-blue-400 uppercase">Pos: ${s.pos_x}</p>
-                        </div>
-                        <button onclick="resetScreen('${s.id}')" class="bg-red-500/10 text-red-500 p-2 rounded-lg text-[10px] hover:bg-red-500 hover:text-white transition-all">✕</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function resetScreen(id) {
-            if(!confirm(`Réinitialiser l'écran ${id} ?`)) return;
-            // On met à jour la base, le Realtime s'occupe de l'affichage
-            await sbClient.from('screens_config').update({ 
-                total_cols: 1, 
-                pos_x: 0, 
-                video_url: '' 
-            }).eq('id', id);
-        }
-
-        // --- GESTION DES PRESETS ---
-        function renderPresets() {
-            const presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
-            const container = document.getElementById('presetList');
-            if(presets.length === 0) {
-                container.innerHTML = '<p class="col-span-2 text-center text-[10px] text-slate-600 italic py-4">Aucun preset sauvegardé</p>';
-                return;
-            }
-            container.innerHTML = presets.map((p, idx) => `
-                <div class="glass p-4 rounded-2xl border border-amber-500/20 space-y-3">
-                    <p class="text-[10px] font-bold uppercase truncate">${p.name}</p>
-                    <div class="flex gap-2">
-                        <button onclick="loadPreset(${idx})" class="flex-1 bg-amber-600/20 text-amber-500 py-2 rounded-lg text-[9px] font-bold uppercase">Charger</button>
-                        <button onclick="deletePreset(${idx})" class="bg-red-500/10 text-red-500 px-3 rounded-lg text-[9px]">✕</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function saveAsPreset() {
-            const name = prompt("Nom du preset :");
-            if(!name) return;
-            const presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
-            presets.push({
-                name: name,
-                assignments: currentAssignments,
-                url: document.getElementById('videoUrl').value,
-                cols: document.getElementById('gridSelect').value
-            });
-            localStorage.setItem('wall_presets', JSON.stringify(presets));
-            renderPresets();
-        }
-
-        function loadPreset(idx) {
-            const presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
-            const p = presets[idx];
-            document.getElementById('videoUrl').value = p.url;
-            document.getElementById('gridSelect').value = p.cols;
-            currentAssignments = p.assignments;
-            createGrid();
-        }
-
-        function deletePreset(idx) {
-            let presets = JSON.parse(localStorage.getItem('wall_presets') || '[]');
-            presets.splice(idx, 1);
-            localStorage.setItem('wall_presets', JSON.stringify(presets));
-            renderPresets();
-        }
-
-        // --- LOGIQUE DE GRILLE ---
+        // --- GRILLE DYNAMIQUE (1D ou 2D) ---
         function createGrid() {
-            const cols = document.getElementById('gridSelect').value;
+            const val = document.getElementById('gridSelect').value;
+            const [rows, cols] = val.split('x').map(Number);
             const container = document.getElementById('wallGrid');
+            
+            container.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
             container.innerHTML = '';
-            for(let i=0; i<cols; i++) {
+
+            for(let i=0; i < (rows * cols); i++) {
+                const screenId = currentAssignments[i];
                 const div = document.createElement('div');
-                const sid = currentAssignments[i];
-                div.className = `flex-1 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center p-4 cursor-pointer transition-all ${sid ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'text-slate-600'}`;
-                div.innerHTML = sid ? `<span class="text-[8px] opacity-50 mb-1">POS ${i}</span><span class="text-[10px] font-bold">${sid}</span>` : `<span class="text-[10px]">VIDE</span>`;
+                div.className = `aspect-video border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${screenId ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 text-slate-600 hover:border-slate-600'}`;
+                
+                div.innerHTML = screenId 
+                    ? `<span class="text-[8px] text-blue-500 font-bold uppercase mb-1">Slot ${i}</span>
+                       <span class="text-[10px] font-black text-white truncate w-full text-center">${screenId}</span>`
+                    : `<span class="text-[10px] uppercase font-bold">Vide</span>`;
+                
                 div.onclick = () => openModal(i);
                 container.appendChild(div);
             }
         }
 
-        function openModal(idx) {
-            targetSlot = idx;
+        // --- MODAL ---
+        function openModal(slotIdx) {
+            targetSlot = slotIdx;
             const list = document.getElementById('screenList');
-            list.innerHTML = availableScreens.map(s => `
-                <button onclick="assign('${s.id}')" class="w-full bg-slate-800 p-4 rounded-xl text-left text-[10px] font-bold uppercase hover:bg-blue-600 transition-all">${s.id}</button>
-            `).join('');
+            list.innerHTML = availableScreens.length ? availableScreens.map(s => `
+                <button onclick="assign('${s.id}')" class="w-full bg-slate-800/50 hover:bg-blue-600 p-4 rounded-2xl text-left text-[10px] font-black uppercase transition-all border border-slate-700">
+                    ${s.id}
+                </button>
+            `).join('') : '<p class="text-[10px] text-center text-slate-500 py-4">Aucun écran détecté</p>';
             document.getElementById('modal').style.display = 'flex';
         }
 
@@ -223,29 +158,95 @@
             closeModal();
             createGrid();
         }
-
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
-        // --- APPLICATION ---
+        // --- DÉPLOIEMENT ---
         async function applyConfig() {
-            const url = document.getElementById('videoUrl').value;
-            const cols = parseInt(document.getElementById('gridSelect').value);
-            if(!url) return alert("URL manquante");
-            
-            // On boucle sur les assignations et on update
+            const url = document.getElementById('videoUrl').value.trim();
+            const val = document.getElementById('gridSelect').value;
+            const [rows, cols] = val.split('x').map(Number);
+
+            if(!url) return alert("Veuillez entrer une URL vidéo");
+            if(Object.keys(currentAssignments).length === 0) return alert("Assignez au moins un écran");
+
             for(let slot in currentAssignments) {
-                const screenId = currentAssignments[slot];
+                const i = parseInt(slot);
+                const screenId = currentAssignments[i];
+                
+                // Calcul des coordonnées 2D
+                const posX = i % cols;
+                const posY = Math.floor(i / cols);
+
                 await sbClient.from('screens_config').update({
-                    video_url: url, 
-                    total_cols: cols, 
-                    pos_x: parseInt(slot), 
-                    total_rows: 1, 
-                    pos_y: 0
+                    video_url: url,
+                    total_cols: cols,
+                    total_rows: rows,
+                    pos_x: posX,
+                    pos_y: posY
                 }).eq('id', screenId);
             }
-            
-            alert("🚀 Mur mis à jour !");
-            // NOTE : On n'appelle plus init() ici pour éviter de doubler le Realtime.
+            alert("✅ Configuration envoyée aux écrans !");
+        }
+
+        // --- AFFICHAGE LIVE ---
+        function renderLiveStatus() {
+            const container = document.getElementById('liveList');
+            container.innerHTML = availableScreens.map(s => `
+                <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 || s.total_rows > 1 ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-700 opacity-60'}">
+                    <div class="space-y-1">
+                        <p class="text-xs font-black uppercase tracking-tighter">${s.id}</p>
+                        <p class="text-[9px] text-slate-500 font-mono truncate w-44">${s.video_url || 'En attente...'}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
+                        <p class="text-[10px] font-black text-blue-400 uppercase">X:${s.pos_x} Y:${s.pos_y}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- PRESETS (LOCAL) ---
+        function renderPresets() {
+            const presets = JSON.parse(localStorage.getItem('mb_presets') || '[]');
+            const container = document.getElementById('presetList');
+            container.innerHTML = presets.map((p, idx) => `
+                <div class="glass p-4 rounded-2xl border border-amber-500/20 space-y-3">
+                    <p class="text-[9px] font-black uppercase truncate text-amber-500">${p.name}</p>
+                    <div class="flex gap-2">
+                        <button onclick="loadPreset(${idx})" class="flex-1 bg-amber-500/10 text-amber-500 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-amber-500 hover:text-white transition-all">Lire</button>
+                        <button onclick="deletePreset(${idx})" class="bg-red-500/10 text-red-500 px-3 rounded-xl text-[10px]">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function saveAsPreset() {
+            const name = prompt("Nom du Preset :");
+            if(!name) return;
+            const presets = JSON.parse(localStorage.getItem('mb_presets') || '[]');
+            presets.push({
+                name,
+                url: document.getElementById('videoUrl').value,
+                grid: document.getElementById('gridSelect').value,
+                assign: currentAssignments
+            });
+            localStorage.setItem('mb_presets', JSON.stringify(presets));
+            renderPresets();
+        }
+
+        function loadPreset(idx) {
+            const p = JSON.parse(localStorage.getItem('mb_presets'))[idx];
+            document.getElementById('videoUrl').value = p.url;
+            document.getElementById('gridSelect').value = p.grid;
+            currentAssignments = p.assign;
+            createGrid();
+        }
+
+        function deletePreset(idx) {
+            let p = JSON.parse(localStorage.getItem('mb_presets'));
+            p.splice(idx, 1);
+            localStorage.setItem('mb_presets', JSON.stringify(p));
+            renderPresets();
         }
 
         init();
