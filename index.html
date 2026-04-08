@@ -7,9 +7,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background: #020617; color: #f8fafc; font-family: system-ui; }
-        .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        /* Thème Premium : Fond Ardoise, Texte Blanc */
+        body { background: #4C5454; color: #FFFFFF; font-family: system-ui, -apple-system, sans-serif; }
+        
+        /* Effet Verre Ultra Épuré */
+        .glass { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+        }
+        
         ::-webkit-scrollbar { display: none; }
+        
+        /* Animation avec la nouvelle couleur Corail */
+        @keyframes pulse-accent {
+            0% { box-shadow: 0 0 0 0 rgba(255, 113, 91, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 113, 91, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 113, 91, 0); }
+        }
+        .updating { animation: pulse-accent 1s ease-out; }
     </style>
 </head>
 <body class="p-4 pb-20">
@@ -18,54 +36,54 @@
         
         <section class="space-y-6">
             <div class="flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase tracking-[0.2em] text-blue-500 italic">Configuration Mur</h2>
-                <select id="gridSelect" onchange="createGrid()" class="bg-slate-800 text-[10px] font-bold p-2 rounded-lg border-none outline-none ring-1 ring-slate-700 cursor-pointer">
-                    <option value="1x2">MUR 1x2</option>
-                    <option value="1x3">MUR 1x3</option>
-                    <option value="1x4">MUR 1x4</option>
-                    <option value="2x2" selected>MUR 2x2 (Carré)</option>
+                <h2 class="text-sm font-black uppercase tracking-[0.2em] text-[#FF715B] italic">Configuration Mur</h2>
+                <select id="gridSelect" onchange="createGrid()" class="bg-white/10 text-white text-[10px] font-bold p-2 rounded-lg border border-white/10 outline-none cursor-pointer hover:bg-white/20 transition-all">
+                    <option value="1x2" class="bg-[#4C5454]">MUR 1x2</option>
+                    <option value="1x3" class="bg-[#4C5454]">MUR 1x3</option>
+                    <option value="1x4" class="bg-[#4C5454]">MUR 1x4</option>
+                    <option value="2x2" selected class="bg-[#4C5454]">MUR 2x2 (Carré)</option>
                 </select>
             </div>
 
             <div id="wallGrid" class="grid gap-3 min-h-[160px]"></div>
 
             <div class="space-y-2">
-                <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">URL Vidéo (Le lien Drive sera nettoyé auto)</label>
+                <label class="text-[10px] font-bold text-white/50 uppercase ml-2">URL Vidéo (Le lien Drive sera nettoyé auto)</label>
                 <input id="videoUrl" type="text" placeholder="https://drive.google.com/..." 
-                    class="w-full bg-slate-900/50 border border-slate-700 rounded-2xl p-4 text-sm focus:border-blue-500 outline-none transition-all font-mono text-blue-300">
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:border-[#FF715B] outline-none transition-all font-mono text-white placeholder-white/30">
             </div>
             
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="applyConfig()" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-lg shadow-blue-900/40 active:scale-95">
+                <button onclick="applyConfig()" class="bg-[#FF715B] hover:opacity-90 text-white py-4 rounded-2xl font-black text-xs uppercase transition-all shadow-lg shadow-[#FF715B]/20 active:scale-95">
                     🚀 Déployer au Live
                 </button>
-                <button onclick="saveAsPreset()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-2xl font-black text-xs uppercase transition-all border border-slate-700 active:scale-95">
+                <button onclick="saveAsPreset()" class="bg-white/5 hover:bg-white/10 text-white py-4 rounded-2xl font-black text-xs uppercase transition-all border border-white/10 active:scale-95">
                     💾 Sauver Preset
                 </button>
             </div>
         </section>
 
-        <hr class="border-slate-800/50">
+        <hr class="border-white/10">
 
         <section class="space-y-4">
-            <h2 class="text-sm font-black uppercase tracking-[0.2em] text-emerald-500 italic">Live Status</h2>
+            <h2 class="text-sm font-black uppercase tracking-[0.2em] text-[#FF715B] italic">Live Status</h2>
             <div id="liveList" class="space-y-3">
-                <p class="text-center text-xs text-slate-600 animate-pulse">Connexion à Supabase...</p>
+                <p class="text-center text-xs text-white/40 animate-pulse">Connexion à Supabase...</p>
             </div>
         </section>
 
         <section class="space-y-4 pb-10">
-            <h2 class="text-sm font-black uppercase tracking-[0.2em] text-amber-500 italic">Bibliothèque</h2>
+            <h2 class="text-sm font-black uppercase tracking-[0.2em] text-[#FF715B] italic">Bibliothèque</h2>
             <div id="presetList" class="grid grid-cols-2 gap-3"></div>
         </section>
 
     </main>
 
-    <div id="modal" class="fixed inset-0 bg-black/95 hidden items-center justify-center p-6 z-50 backdrop-blur-sm">
-        <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4 shadow-2xl border-slate-700">
-            <h3 class="text-center text-xs font-black uppercase text-slate-400">Assigner un écran</h3>
+    <div id="modal" class="fixed inset-0 bg-[#4C5454]/95 hidden items-center justify-center p-6 z-50 backdrop-blur-md">
+        <div class="glass w-full max-w-xs rounded-3xl p-6 space-y-4 shadow-2xl">
+            <h3 class="text-center text-xs font-black uppercase text-white/60">Assigner un écran</h3>
             <div id="screenList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1"></div>
-            <button onclick="closeModal()" class="w-full text-[10px] font-bold py-3 text-slate-500 uppercase hover:text-white transition-all">Annuler</button>
+            <button onclick="closeModal()" class="w-full text-[10px] font-bold py-3 text-white/50 uppercase hover:text-white transition-all">Annuler</button>
         </div>
     </div>
 
@@ -121,10 +139,10 @@
             for(let i=0; i < (rows * cols); i++) {
                 const screenId = currentAssignments[i];
                 const div = document.createElement('div');
-                div.className = `aspect-video border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${screenId ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 text-slate-600 hover:border-slate-600'}`;
+                div.className = `aspect-video border-2 border-dashed rounded-2xl flex flex-col items-center justify-center p-2 cursor-pointer transition-all ${screenId ? 'border-[#FF715B] bg-[#FF715B]/10' : 'border-white/20 text-white/40 hover:border-white/40'}`;
                 
                 div.innerHTML = screenId 
-                    ? `<span class="text-[8px] text-blue-500 font-bold uppercase mb-1">Slot ${i}</span>
+                    ? `<span class="text-[8px] text-[#FF715B] font-bold uppercase mb-1">Slot ${i}</span>
                        <span class="text-[10px] font-black text-white truncate w-full text-center">${screenId}</span>`
                     : `<span class="text-[10px] uppercase font-bold">Vide</span>`;
                 
@@ -138,10 +156,10 @@
             targetSlot = slotIdx;
             const list = document.getElementById('screenList');
             list.innerHTML = availableScreens.length ? availableScreens.map(s => `
-                <button onclick="assign('${s.id}')" class="w-full bg-slate-800/50 hover:bg-blue-600 p-4 rounded-2xl text-left text-[10px] font-black uppercase transition-all border border-slate-700">
+                <button onclick="assign('${s.id}')" class="w-full bg-white/5 hover:bg-[#FF715B] p-4 rounded-2xl text-left text-[10px] font-black uppercase transition-all border border-white/10 text-white">
                     ${s.id}
                 </button>
-            `).join('') : '<p class="text-[10px] text-center text-slate-500 py-4">Aucun écran détecté</p>';
+            `).join('') : '<p class="text-[10px] text-center text-white/50 py-4">Aucun écran détecté</p>';
             document.getElementById('modal').style.display = 'flex';
         }
 
@@ -222,17 +240,17 @@
         function renderLiveStatus() {
             const container = document.getElementById('liveList');
             container.innerHTML = availableScreens.map(s => `
-                <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 || s.total_rows > 1 ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-700 opacity-60'}">
+                <div class="glass p-4 rounded-2xl flex justify-between items-center border-l-4 ${s.total_cols > 1 || s.total_rows > 1 ? 'border-[#FF715B] bg-[#FF715B]/5' : 'border-white/10 opacity-60'}">
                     <div class="space-y-1">
-                        <p class="text-xs font-black uppercase tracking-tighter">${s.id}</p>
-                        <p class="text-[9px] text-slate-500 font-mono truncate w-40">${s.video_url || 'En attente...'}</p>
+                        <p class="text-xs font-black uppercase tracking-tighter text-white">${s.id}</p>
+                        <p class="text-[9px] text-white/50 font-mono truncate w-40">${s.video_url || 'En attente...'}</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">${s.total_cols}x${s.total_rows}</p>
-                            <p class="text-[10px] font-black text-blue-400 uppercase">X:${s.pos_x} Y:${s.pos_y}</p>
+                            <p class="text-[9px] font-bold text-white/60 uppercase">${s.total_cols}x${s.total_rows}</p>
+                            <p class="text-[10px] font-black text-[#FF715B] uppercase">X:${s.pos_x} Y:${s.pos_y}</p>
                         </div>
-                        <button onclick="resetScreen('${s.id}')" class="bg-red-500/10 text-red-500 p-2 rounded-lg text-[10px] hover:bg-red-500 hover:text-white transition-all" title="Détacher cet écran">✕</button>
+                        <button onclick="resetScreen('${s.id}')" class="bg-white/5 text-white/50 p-2 rounded-lg text-[10px] hover:bg-[#FF715B] hover:text-white transition-all" title="Détacher cet écran">✕</button>
                     </div>
                 </div>
             `).join('');
@@ -243,15 +261,15 @@
             const presets = JSON.parse(localStorage.getItem('mb_presets') || '[]');
             const container = document.getElementById('presetList');
             if(presets.length === 0) {
-                container.innerHTML = '<p class="col-span-2 text-center text-[10px] text-slate-600 italic py-4">Aucun preset sauvegardé</p>';
+                container.innerHTML = '<p class="col-span-2 text-center text-[10px] text-white/40 italic py-4">Aucun preset sauvegardé</p>';
                 return;
             }
             container.innerHTML = presets.map((p, idx) => `
-                <div class="glass p-4 rounded-2xl border border-amber-500/20 space-y-3">
-                    <p class="text-[9px] font-black uppercase truncate text-amber-500">${p.name}</p>
+                <div class="glass p-4 rounded-2xl border border-white/10 space-y-3">
+                    <p class="text-[9px] font-black uppercase truncate text-[#FF715B]">${p.name}</p>
                     <div class="flex gap-2">
-                        <button onclick="loadPreset(${idx})" class="flex-1 bg-amber-500/10 text-amber-500 py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-amber-500 hover:text-white transition-all">Lire</button>
-                        <button onclick="deletePreset(${idx})" class="bg-red-500/10 text-red-500 px-3 rounded-xl text-[10px]">✕</button>
+                        <button onclick="loadPreset(${idx})" class="flex-1 bg-white/5 text-white py-2 rounded-xl text-[9px] font-bold uppercase hover:bg-[#FF715B] transition-all">Lire</button>
+                        <button onclick="deletePreset(${idx})" class="bg-white/5 text-white/50 px-3 rounded-xl text-[10px] hover:bg-[#FF715B] hover:text-white transition-all">✕</button>
                     </div>
                 </div>
             `).join('');
