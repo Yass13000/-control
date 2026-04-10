@@ -42,7 +42,6 @@
 <body class="p-4 pb-32">
 
     <main class="max-w-xl mx-auto space-y-6">
-        
         <header class="flex justify-between items-end px-2 pt-2">
             <div>
                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Centre de Contrôle</p>
@@ -83,7 +82,6 @@
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3">Bibliothèque Sauvegardée</h2>
             <div id="presetList" class="space-y-3"></div>
         </section>
-
     </main>
 
     <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -100,18 +98,11 @@
         const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
         let availableScreens = [];
-        
-        // NOUVEAU SYSTÈME MULTI-ZONES
-        let zones = [
-            { id: generateId(), format: '2x2', url: '', assignments: {} }
-        ];
-
+        let zones = [{ id: generateId(), format: '2x2', url: '', assignments: {} }];
         let targetZoneId = null;
         let targetSlotIdx = null;
 
-        function generateId() {
-            return Math.random().toString(36).substr(2, 9);
-        }
+        function generateId() { return Math.random().toString(36).substr(2, 9); }
 
         async function init() {
             const { data, error } = await sbClient.from('screens_config').select('*');
@@ -123,37 +114,18 @@
             renderZones();
         }
 
-        // --- GESTION DES ZONES (MURS) ---
-        function addZone() {
-            zones.push({ id: generateId(), format: '1x2', url: '', assignments: {} });
-            renderZones();
-        }
-
-        function removeZone(id) {
-            zones = zones.filter(z => z.id !== id);
-            renderZones();
-        }
-
+        function addZone() { zones.push({ id: generateId(), format: '1x2', url: '', assignments: {} }); renderZones(); }
+        function removeZone(id) { zones = zones.filter(z => z.id !== id); renderZones(); }
         function updateZoneFormat(id, format) {
             const zone = zones.find(z => z.id === id);
-            if (zone) {
-                zone.format = format;
-                zone.assignments = {}; // Reset les écrans si on change la taille pour éviter les bugs
-                renderZones();
-            }
+            if (zone) { zone.format = format; zone.assignments = {}; renderZones(); }
         }
-
-        function updateZoneUrl(id, url) {
-            const zone = zones.find(z => z.id === id);
-            if (zone) zone.url = url;
-        }
+        function updateZoneUrl(id, url) { const zone = zones.find(z => z.id === id); if (zone) zone.url = url; }
 
         function renderZones() {
             const container = document.getElementById('zonesContainer');
             container.innerHTML = zones.map((z, index) => {
                 const [rows, cols] = z.format.split('x').map(Number);
-                
-                // Génération de la grille
                 let gridHtml = `<div class="grid gap-3" style="grid-template-columns: repeat(${cols}, minmax(0, 1fr))">`;
                 for(let i=0; i < (rows * cols); i++) {
                     const screenId = z.assignments[i];
@@ -180,9 +152,7 @@
                                 ${zones.length > 1 ? `<button onclick="removeZone('${z.id}')" class="text-red-500 bg-red-50 px-3 py-2 rounded-xl text-xs font-bold hover:bg-red-100">✕</button>` : ''}
                             </div>
                         </div>
-                        
                         ${gridHtml}
-
                         <div class="space-y-2 pt-2">
                             <div class="flex justify-between items-center px-1">
                                 <label class="text-[11px] font-bold text-gray-500 uppercase">Vidéo Assignée au Mur ${index + 1}</label>
@@ -203,12 +173,23 @@
             }).join('');
         }
 
-        // --- UPLOAD PAR ZONE ---
+        // --- UPLOAD AVEC LIMITE DE POIDS ---
         async function uploadMedia(input, zoneId) {
             const file = input.files[0];
             if (!file) return;
+
             const icon = document.getElementById(`uploadIcon-${zoneId}`);
             const status = document.getElementById(`uploadStatus-${zoneId}`);
+
+            const limiteMo = 200;
+            const tailleFichierMo = file.size / (1024 * 1024);
+
+            if (tailleFichierMo > limiteMo) {
+                alert(`❌ Fichier trop lourd (${tailleFichierMo.toFixed(1)} Mo).\nLa limite est fixée à ${limiteMo} Mo pour garantir la fluidité.`);
+                input.value = ""; 
+                return;
+            }
+
             icon.innerHTML = "⏳";
             status.innerText = "Upload...";
 
@@ -231,7 +212,6 @@
             setTimeout(() => { icon.innerHTML = "📁"; status.innerText = ""; }, 3000);
         }
 
-        // --- ASSIGNATION MODAL ---
         function openModal(zoneId, slotIdx) {
             targetZoneId = zoneId;
             targetSlotIdx = slotIdx;
@@ -256,31 +236,20 @@
         function assign(screenId) { 
             const zone = zones.find(z => z.id === targetZoneId);
             if(zone) {
-                // On vérifie que l'écran n'est pas déjà dans un autre slot
-                for(let key in zone.assignments) {
-                    if(zone.assignments[key] === screenId) delete zone.assignments[key];
-                }
+                for(let key in zone.assignments) { if(zone.assignments[key] === screenId) delete zone.assignments[key]; }
                 zone.assignments[targetSlotIdx] = screenId;
             }
-            closeModal(); 
-            renderZones(); 
+            closeModal(); renderZones(); 
         }
-
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
-        // --- DEPLOIEMENT MULTI-MURS ---
         async function applyConfig() {
             let updatesCount = 0;
             let missingUrl = false;
 
             for(let z of zones) {
                 let url = document.getElementById(`videoUrl-${z.id}`).value.trim();
-                
-                // Si la zone a des écrans assignés mais pas de vidéo
-                if(Object.keys(z.assignments).length > 0 && !url) {
-                    missingUrl = true;
-                    continue; // On passe ce mur
-                }
+                if(Object.keys(z.assignments).length > 0 && !url) { missingUrl = true; continue; }
 
                 if (url.includes("drive.google.com") && url.includes("/d/")) {
                     const id = url.split("/d/")[1].split("/")[0];
@@ -288,7 +257,6 @@
                 }
 
                 const [rows, cols] = z.format.split('x').map(Number);
-
                 for(let i = 0; i < (rows * cols); i++) {
                     const screenId = z.assignments[i];
                     if(screenId) {
@@ -300,19 +268,13 @@
                     }
                 }
             }
-
-            if(missingUrl) {
-                alert("⚠️ Attention: Certains murs avaient des écrans mais pas de vidéo renseignée. Ils ont été ignorés.");
-            }
-            
+            if(missingUrl) alert("⚠️ Certains murs avaient des écrans mais pas de vidéo. Ils ont été ignorés.");
             if(updatesCount > 0) alert(`✅ ${updatesCount} écran(s) mis à jour avec succès !`);
             else alert("Rien n'a été déployé. Assurez-vous d'avoir assigné des écrans ET une vidéo.");
         }
 
-        // --- SYNC TEMPS RÉEL ET SANTÉ ---
         function setupRealtime() {
-            sbClient.channel('any').on('postgres_changes', 
-                { event: '*', schema: 'public', table: 'screens_config' }, 
+            sbClient.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'screens_config' }, 
                 (payload) => {
                     const { eventType, new: newRow, old: oldRow } = payload;
                     if (eventType === 'DELETE') availableScreens = availableScreens.filter(s => s.id !== oldRow.id);
@@ -328,9 +290,7 @@
 
         function isScreenOnline(lastPing) {
             if (!lastPing) return false;
-            const pingDate = new Date(lastPing).getTime();
-            const now = new Date().getTime();
-            return ((now - pingDate) / 1000) < 45;
+            return ((new Date().getTime() - new Date(lastPing).getTime()) / 1000) < 45;
         }
 
         function renderLiveStatus() {
@@ -347,17 +307,13 @@
             container.innerHTML = availableScreens.map(s => {
                 let pingText = "Jamais connecté";
                 let isOnline = false;
-                
                 if (s.last_ping) {
-                    const pingDate = new Date(s.last_ping).getTime();
-                    const diffSeconds = Math.floor((now - pingDate) / 1000);
+                    const diffSeconds = Math.floor((now - new Date(s.last_ping).getTime()) / 1000);
                     isOnline = diffSeconds < 45;
-                    
                     if (diffSeconds < 60) pingText = `Ping: il y a ${diffSeconds} sec`;
                     else if (diffSeconds < 3600) pingText = `Ping: il y a ${Math.floor(diffSeconds/60)} min`;
                     else pingText = `Ping: Hors ligne`;
                 }
-
                 if(isOnline) onlineCount++;
 
                 return `
@@ -375,28 +331,32 @@
                                 </div>
                             </div>
                         </div>
-                        <button onclick="resetScreen('${s.id}')" class="text-gray-400 hover:text-red-500 text-xs font-bold px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 active:bg-gray-50">Détacher</button>
+                        <div class="flex gap-2">
+                            <button onclick="resetScreen('${s.id}')" class="text-gray-500 hover:text-blue-500 text-[10px] font-bold px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 active:bg-gray-50" title="Garder la TV mais la vider">Détacher</button>
+                            <button onclick="deleteScreen('${s.id}')" class="text-red-500 hover:text-white hover:bg-red-500 text-[10px] font-bold px-3 py-2 bg-red-50 rounded-xl shadow-sm border border-red-100 transition-colors" title="Supprimer de la base">Supprimer</button>
+                        </div>
                     </div>
                 `;
             }).join('');
-            
             document.getElementById('globalStatus').innerText = `${onlineCount}/${availableScreens.length} ACTIFS`;
         }
 
         async function resetScreen(id) {
-            if(!confirm(`Voulez-vous réinitialiser l'écran ${id} ? (Il deviendra noir)`)) return;
+            if(!confirm(`Voulez-vous vider l'écran ${id} ? (Il deviendra noir)`)) return;
             await sbClient.from('screens_config').update({ total_cols: 1, total_rows: 1, pos_x: 0, pos_y: 0, video_url: '' }).eq('id', id);
-            
-            // Retire l'écran de toutes les zones en local
-            zones.forEach(z => {
-                for(let key in z.assignments) {
-                    if(z.assignments[key] === id) delete z.assignments[key];
-                }
-            });
+            zones.forEach(z => { for(let key in z.assignments) { if(z.assignments[key] === id) delete z.assignments[key]; } });
             renderZones();
         }
 
-        // --- SAUVEGARDE DES PRESETS ---
+        // --- NOUVEAU : SUPPRESSION DÉFINITIVE ---
+        async function deleteScreen(id) {
+            if(!confirm(`⚠️ DANGER : Voulez-vous vraiment SUPPRIMER définitivement l'écran "${id}" ?\n\nIl s'éteindra et demandera à être renommé sur la TV.`)) return;
+            const { error } = await sbClient.from('screens_config').delete().eq('id', id);
+            if (error) { alert("Erreur de suppression : " + error.message); return; }
+            zones.forEach(z => { for(let key in z.assignments) { if(z.assignments[key] === id) delete z.assignments[key]; } });
+            renderZones();
+        }
+
         function renderPresets() {
             const presets = JSON.parse(localStorage.getItem('mb_presets_v2') || '[]');
             const container = document.getElementById('presetList');
@@ -417,13 +377,8 @@
         function saveAsPreset() {
             const name = prompt("Nom du Setup (ex: Matin Complet) :");
             if(!name) return;
-            
-            // On sauvegarde la configuration complète des zones
             const presets = JSON.parse(localStorage.getItem('mb_presets_v2') || '[]');
-            // Deep copy des zones pour ne pas lier les références
-            const zonesCopy = JSON.parse(JSON.stringify(zones)); 
-            
-            presets.push({ name, zones: zonesCopy });
+            presets.push({ name, zones: JSON.parse(JSON.stringify(zones)) });
             localStorage.setItem('mb_presets_v2', JSON.stringify(presets));
             renderPresets();
         }
