@@ -14,10 +14,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* INTÉGRATION DE TA POLICE LOCALE */
+        @font-face {
+            font-family: 'HelveticaCustom';
+            src: url('/fonts/Helvetica.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
         body { 
             background: #F2F2F7; 
             color: #1C1C1E; 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; 
+            /* On applique HelveticaCustom en priorité absolue */
+            font-family: 'HelveticaCustom', -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; 
             -webkit-font-smoothing: antialiased;
         }
         
@@ -173,7 +183,6 @@
             }).join('');
         }
 
-        // --- UPLOAD AVEC LIMITE DE POIDS ---
         async function uploadMedia(input, zoneId) {
             const file = input.files[0];
             if (!file) return;
@@ -251,10 +260,18 @@
                 let url = document.getElementById(`videoUrl-${z.id}`).value.trim();
                 if(Object.keys(z.assignments).length > 0 && !url) { missingUrl = true; continue; }
 
-                if (url.includes("drive.google.com") && url.includes("/d/")) {
-                    const id = url.split("/d/")[1].split("/")[0];
-                    url = `https://drive.google.com/uc?export=download&id=${id}`;
+                // --- NOUVEAU PARSEUR ROBUSTE POUR GOOGLE DRIVE & DROPBOX ---
+                if (url.includes("drive.google.com")) {
+                    // Cherche la chaîne unique de ~33 caractères (l'ID de fichier) au milieu de n'importe quel lien Drive
+                    const matchId = url.match(/[-\w]{25,}/);
+                    if (matchId && matchId[0]) {
+                        url = `https://drive.google.com/uc?export=download&id=${matchId[0]}`;
+                    }
+                } else if (url.includes("dropbox.com")) {
+                    // Correction rapide pour les liens Dropbox (force le fichier brut au lieu de la page web)
+                    url = url.replace("dl=0", "raw=1").replace("dl=1", "raw=1");
                 }
+                // ------------------------------------------------------------
 
                 const [rows, cols] = z.format.split('x').map(Number);
                 for(let i = 0; i < (rows * cols); i++) {
@@ -348,7 +365,6 @@
             renderZones();
         }
 
-        // --- NOUVEAU : SUPPRESSION DÉFINITIVE ---
         async function deleteScreen(id) {
             if(!confirm(`⚠️ DANGER : Voulez-vous vraiment SUPPRIMER définitivement l'écran "${id}" ?\n\nIl s'éteindra et demandera à être renommé sur la TV.`)) return;
             const { error } = await sbClient.from('screens_config').delete().eq('id', id);
