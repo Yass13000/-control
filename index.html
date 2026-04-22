@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MenuBoard Wall</title>
     
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/iconmob.png">
     <meta name="theme-color" content="#F2F2F7">
@@ -14,7 +18,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* INTÉGRATION DE TA POLICE LOCALE */
         @font-face {
             font-family: 'HelveticaCustom';
             src: url('/fonts/Helvetica.ttf') format('truetype');
@@ -26,7 +29,6 @@
         body { 
             background: #F2F2F7; 
             color: #1C1C1E; 
-            /* On applique HelveticaCustom en priorité absolue */
             font-family: 'HelveticaCustom', -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; 
             -webkit-font-smoothing: antialiased;
         }
@@ -92,6 +94,11 @@
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3">Bibliothèque Sauvegardée</h2>
             <div id="presetList" class="space-y-3"></div>
         </section>
+
+        <button onclick="hardRefresh()" class="w-full text-center text-[10px] font-bold text-gray-400 mt-6 underline opacity-70 hover:opacity-100 active:text-gray-800 transition-all uppercase">
+            🔄 Forcer la mise à jour (Vider le cache)
+        </button>
+
     </main>
 
     <div id="modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -103,8 +110,9 @@
     </div>
 
     <script>
-        const SB_URL = "https://bfpddpdkortuhrzxflmt.supabase.co";
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmcGRkcGRrb3J0dWhyenhmbG10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjMwNTgsImV4cCI6MjA5MTIzOTA1OH0.F5Rk6m8qE81UrCmhYRxRJy_QucxXX8CiIexrNDXb3ME";
+        // Clés Supabase
+        const SB_URL = "https://qterhrrgommazueinntd.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0ZXJocnJnb21tYXp1ZWlubnRkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njg4MzEwNywiZXhwIjoyMDkyNDU5MTA3fQ.UxuMyrex3ZxGp-s1WWr_bJ-aTv24vmOb9mumw27pLUA";
         const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
         let availableScreens = [];
@@ -260,18 +268,14 @@
                 let url = document.getElementById(`videoUrl-${z.id}`).value.trim();
                 if(Object.keys(z.assignments).length > 0 && !url) { missingUrl = true; continue; }
 
-                // --- NOUVEAU PARSEUR ROBUSTE POUR GOOGLE DRIVE & DROPBOX ---
                 if (url.includes("drive.google.com")) {
-                    // Cherche la chaîne unique de ~33 caractères (l'ID de fichier) au milieu de n'importe quel lien Drive
                     const matchId = url.match(/[-\w]{25,}/);
                     if (matchId && matchId[0]) {
                         url = `https://drive.google.com/uc?export=download&id=${matchId[0]}`;
                     }
                 } else if (url.includes("dropbox.com")) {
-                    // Correction rapide pour les liens Dropbox (force le fichier brut au lieu de la page web)
                     url = url.replace("dl=0", "raw=1").replace("dl=1", "raw=1");
                 }
-                // ------------------------------------------------------------
 
                 const [rows, cols] = z.format.split('x').map(Number);
                 for(let i = 0; i < (rows * cols); i++) {
@@ -413,8 +417,35 @@
             renderPresets();
         }
 
+        // --- NOUVEAU SYSTÈME ANTI-CACHE DU SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    // Force le Service Worker à chercher une mise à jour silencieusement
+                    reg.update(); 
+                }).catch(()=>{});
+            });
+        }
+
+        // --- FONCTION POUR LE BOUTON D'URGENCE ---
+        function hardRefresh() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
+            }
+            // Vide le cache du navigateur
+            if ('caches' in window) {
+                caches.keys().then(keys => {
+                    Promise.all(keys.map(key => caches.delete(key))).then(() => {
+                        window.location.reload(true); // Recharge brutalement
+                    });
+                });
+            } else {
+                window.location.reload(true);
+            }
         }
 
         setInterval(renderLiveStatus, 1000);
